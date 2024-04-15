@@ -70,8 +70,9 @@ func fetchData(symbol, market, apiKey string) ([]string, error) {
 	return closePrices, nil
 }
 
-func calculateSMA(closePrices []string, n int) float64 {
-	periods := closePrices[:n]
+func calculateSMA(closePrices []string, n int, gap int) float64 {
+	endIndex := n + gap
+	periods := closePrices[gap:endIndex]
 
 	var closingSum float64 = 0
 
@@ -90,6 +91,27 @@ func calculateSMA(closePrices []string, n int) float64 {
 	return SMA
 }
 
+func calculateEMA(closePrices []string, n int) ([]float64, error) {
+    if len(closePrices) < n {
+        return nil, fmt.Errorf("not enough data points to calculate starting SMA")
+    }
+
+    startingSMA := calculateSMA(closePrices, n, 0)
+    multiplier := 2.0 / float64(n+1)
+    EMAs := make([]float64, len(closePrices))
+
+    EMAs[0] = startingSMA
+    for i := 1; i < len(closePrices); i++ {
+        price, err := strconv.ParseFloat(closePrices[i], 64)
+        if err != nil {
+            return nil, fmt.Errorf("error converting closing price to float: %v", err)
+        }
+        EMAs[i] = (price - EMAs[i-1]) * multiplier + EMAs[i-1]
+    }
+
+    return EMAs, nil
+}
+
 func main() {
 	symbol := "SOL"
 	market := "USD"
@@ -100,15 +122,27 @@ func main() {
 	currentPrice, _ := strconv.ParseFloat(currentPriceString, 64)
 	fmt.Println("Current price: ", currentPrice)
 
-	shortSMA := calculateSMA(closePrices, 50)
-	longSMA := calculateSMA(closePrices, 200)
+	shortSMA := calculateSMA(closePrices, 50, 0)
+	longSMA := calculateSMA(closePrices, 200, 0)
 
-	fmt.Println(shortSMA, longSMA)
+	fmt.Println("Short and long SMAs:", shortSMA, longSMA)
 
 	fmt.Println("SMA crossing strategy (50/200 days data):")
 	if shortSMA > longSMA {
 		fmt.Println("Signal: buy")
 	} else if shortSMA < longSMA {
+		fmt.Println("Signal: sell")
+	}
+
+	shortEMAs, _ := calculateEMA(closePrices, 50)
+	longEMAs, _ := calculateEMA(closePrices, 200)
+
+	fmt.Println("Short and long EMAs:", shortEMAs[len(shortEMAs)-1], longEMAs[len(longEMAs)-1])
+
+	fmt.Println("EMA crossing strategy (50/200 days data):")
+	if shortEMAs[len(shortEMAs)-1] > longEMAs[len(longEMAs)-1] {
+		fmt.Println("Signal: buy")
+	} else if shortEMAs[len(shortEMAs)-1] < longEMAs[len(longEMAs)-1] {
 		fmt.Println("Signal: sell")
 	}
 	
